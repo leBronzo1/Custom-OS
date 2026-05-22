@@ -1,32 +1,35 @@
-CC      = gcc
-CFLAGS  = -Wall -O2 -std=c11 -Iinclude   # -Iinclude so #include "renderer.h" works
-LIBS    = -lSDL2 -lSDL2_ttf -lSDL2_image -lSDL2_mixer -lwiringPi
+CC     = gcc
+CFLAGS = -Wall -O2 -std=c11 -Iinclude
+OUT    = myos
 
 SRC_DIR   = src
 BUILD_DIR = build
+SRCS      = $(wildcard $(SRC_DIR)/*.c)
+OBJS      = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRCS))
 
-# Auto-find all .c files in src/
-SRCS = $(wildcard $(SRC_DIR)/*.c)
-# Turn src/main.c → build/main.o etc
-OBJS = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRCS))
+# Detect OS
+UNAME := $(shell uname)
 
-OUT = myos
+ifeq ($(UNAME), Darwin)
+    # macOS — homebrew SDL2 paths
+    CFLAGS += $(shell sdl2-config --cflags)
+    LIBS    = $(shell sdl2-config --libs) -lSDL2_ttf -lSDL2_image -lSDL2_mixer
+else
+    # Linux / Raspberry Pi
+    CFLAGS += $(shell sdl2-config --cflags)
+    LIBS    = $(shell sdl2-config --libs) -lSDL2_ttf -lSDL2_image -lSDL2_mixer -lwiringPi
+endif
 
 all: $(BUILD_DIR) $(OUT)
 
-# Link all object files into final binary
 $(OUT): $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBS)
 
-# Compile each .c to a .o
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Create build dir if it doesn't exist
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 clean:
 	rm -rf $(BUILD_DIR) $(OUT)
-
-.PHONY: all clean
