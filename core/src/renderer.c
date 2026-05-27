@@ -1,5 +1,4 @@
-#include <stdio.h>
-#include <SDL2/SDL.h>
+#include "renderer.h"
 
 int init_sdl(SDL_Window** win, SDL_Renderer** ren) {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -20,19 +19,4 @@ int init_sdl(SDL_Window** win, SDL_Renderer** ren) {
     if (!*ren) { SDL_DestroyWindow(*win); SDL_Quit(); return 0; }
 
     return 1;  // success
-}
-
-int main(int argc, char* argv[]) {
-    SDL_Window*   win = NULL;
-    SDL_Renderer* ren = NULL;
-
-    if (!init_sdl(&win, &ren)) return 1;
-
-    // event loop here, win and ren are usable
-    // ...
-
-    SDL_DestroyRenderer(ren);
-    SDL_DestroyWindow(win);
-    SDL_Quit();
-    return 0;
 }
