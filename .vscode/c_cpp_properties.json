@@ -1,0 +1,26 @@
+{
+    "configurations": [
+        {
+            "name": "Mac",
+            "includePath": [
+                "${workspaceFolder}/core/include",
+                "/opt/homebrew/include",
+                "/opt/homebrew/include/SDL2"
+            ],
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "c11",
+            "intelliSenseMode": "macos-clang-x64"
+        },
+        {
+            "name": "Linux (Pi)",
+            "includePath": [
+                "${workspaceFolder}/core/include",
+                "/usr/include/SDL2"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c11",
+            "intelliSenseMode": "linux-gcc-arm64"
+        }
+    ],
+    "version": 4
+}

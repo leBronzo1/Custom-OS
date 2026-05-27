@@ -21,10 +21,17 @@
 #include "../include/ipc.h"
 #include "../include/state.h"
 
-int main() {
-   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK) != 0) {
-        fprintf(stderr, "[myos] SDL_Init failed: %s\n", SDL_GetError());
-        return 1;
-    }
+int main(int argc, char* argv[]) {
+    SDL_Window*   win = NULL;
+    SDL_Renderer* ren = NULL;
+
+    if (!init_sdl(&win, &ren)) return 1;
+
+    // event loop here, win and ren are usable
+    // ...
+
+    SDL_DestroyRenderer(ren);
+    SDL_DestroyWindow(win);
+    SDL_Quit();
     return 0;
 }
