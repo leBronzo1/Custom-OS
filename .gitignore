@@ -1,0 +1,4 @@
+# Build artifacts
+core/build/*.o
+core/myos
+.DS_Store
