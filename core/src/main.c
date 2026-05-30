@@ -22,16 +22,13 @@
 #include "../include/state.h"
 
 int main(int argc, char* argv[]) {
-    SDL_Window*   win = NULL;
-    SDL_Renderer* ren = NULL;
+    Renderer renderer = {0};
 
-    if (!init_sdl(&win, &ren)) return 1;
+    if (!init_sdl(&renderer))
+        return 1;
 
-    // event loop here, win and ren are usable
-    // ...
+    run_loop(&renderer);
+    shutdown_sdl(&renderer);
 
-    SDL_DestroyRenderer(ren);
-    SDL_DestroyWindow(win);
-    SDL_Quit();
     return 0;
 }
