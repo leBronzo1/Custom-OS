@@ -16,7 +16,6 @@
 
 #include "../include/types.h"
 #include "../include/renderer.h"
-#include "../include/input.h"
 #include "../include/audio.h"
 #include "../include/ipc.h"
 #include "../include/state.h"
@@ -27,7 +26,7 @@ int main(int argc, char* argv[]) {
     if (!init_sdl(&renderer))
         return 1;
 
-    run_loop(&renderer);
+    int err = run_loop(&renderer);
     shutdown_sdl(&renderer);
 
     return 0;
