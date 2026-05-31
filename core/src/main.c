@@ -19,14 +19,17 @@
 #include "../include/audio.h"
 #include "../include/ipc.h"
 #include "../include/state.h"
+#include "../include/errors.h"
 
 int main(int argc, char* argv[]) {
     Renderer renderer = {0};
 
-    if (!init_sdl(&renderer))
+    if (!init_sdl(&renderer)) {
         return 1;
+    }
 
     int err = run_loop(&renderer);
+    error_handling(err);
     shutdown_sdl(&renderer);
 
     return 0;

@@ -6,7 +6,6 @@
 CC      = gcc
 OUT     = myos
 
-# Paths relative to core/ (where make is invoked from)
 SRC_DIR   = src
 INC_DIR   = include
 BUILD_DIR = build
@@ -21,11 +20,11 @@ UNAME := $(shell uname)
 
 ifeq ($(UNAME), Darwin)
     SDL_CFLAGS = $(shell sdl2-config --cflags)
-    SDL_LIBS   = $(shell sdl2-config --libs) -lSDL2_ttf -lSDL2_image -lSDL2_mixer
+    SDL_LIBS   = $(shell sdl2-config --libs) -lSDL2_ttf -lSDL2_mixer
     EXTRA_LIBS =
 else
     SDL_CFLAGS = $(shell sdl2-config --cflags)
-    SDL_LIBS   = $(shell sdl2-config --libs) -lSDL2_ttf -lSDL2_image -lSDL2_mixer
+    SDL_LIBS   = $(shell sdl2-config --libs) -lSDL2_ttf -lSDL2_mixer
     EXTRA_LIBS = -lwiringPi -lm
 endif
 
