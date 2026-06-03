@@ -14,17 +14,15 @@
     #include <SDL2/SDL_mixer.h>
 #endif
 
-#include "../include/types.h"
 #include "../include/renderer.h"
 #include "../include/audio.h"
 #include "../include/ipc.h"
-#include "../include/state.h"
 #include "../include/errors.h"
 
 int main(int argc, char* argv[]) {
     Renderer renderer = {0};
 
-    if (!init_sdl(&renderer)) {
+    if (init_sdl(&renderer) != 0) {
         return 1;
     }
 

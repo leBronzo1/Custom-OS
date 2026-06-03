@@ -2,3 +2,5 @@
 core/build/*.o
 core/myos
 .DS_Store
+assets/icons/*.bmp
+*.ttf
