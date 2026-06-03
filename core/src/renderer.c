@@ -37,7 +37,7 @@ int init_sdl(Renderer* r) {
         return 4;
     }
 
-    r->font = TTF_OpenFont("assets/fonts/myfont.ttf", 24);
+    r->font = TTF_OpenFont("../assets/fonts/myfont.ttf", 24);
     if (!r->font) {
         printf("Font load error: %s\n", TTF_GetError());
         return 5;
@@ -54,17 +54,41 @@ int run_loop(Renderer* r) {
 
     SDL_Event e;
     int running = 1;
+    AppState state = STATE_MENU;        // start on menu
+    SDL_Color white = {255, 255, 255, 255};
 
     while (running) {
         while (SDL_PollEvent(&e)) {
-            handle_input(&e, &running);
+            if (e.type == SDL_QUIT) running = 0;
+            if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE)
+                state = STATE_MENU;     // escape always goes back
         }
 
         SDL_SetRenderDrawColor(r->ren, 15, 20, 40, 255);
         SDL_RenderClear(r->ren);
 
+        // Background image drawn first, menu sits on top
         if (r->image1) {
             SDL_RenderCopy(r->ren, r->image1, NULL, NULL);
+        }
+
+        switch (state) {
+            case STATE_MENU:
+                menu_draw(r, white);    // white unused until hover is done
+                // draw labels on top of each button
+                draw_text(r, "Games", 350, 215, white);
+                draw_text(r, "Music", 350, 295, white);
+                draw_text(r, "Books", 350, 375, white);
+                break;
+            case STATE_GAMES:
+                draw_text(r, "Games screen - ESC to go back", 200, 280, white);
+                break;
+            case STATE_MUSIC:
+                draw_text(r, "Music screen - ESC to go back", 200, 280, white);
+                break;
+            case STATE_BOOKS:
+                draw_text(r, "Books screen - ESC to go back", 200, 280, white);
+                break;
         }
 
         SDL_RenderPresent(r->ren);
@@ -121,7 +145,7 @@ bool draw_text(Renderer* r, const char* text, int x, int y, SDL_Color color) {
 
     SDL_Texture* tex = SDL_CreateTextureFromSurface(r->ren, surf);
     SDL_FreeSurface(surf);
-    if (!tex) return;
+    if (!tex) return false;
 
     int w, h;
     SDL_QueryTexture(tex, NULL, NULL, &w, &h);
@@ -129,4 +153,28 @@ bool draw_text(Renderer* r, const char* text, int x, int y, SDL_Color color) {
 
     SDL_RenderCopy(r->ren, tex, NULL, &label_rect);
     SDL_DestroyTexture(tex);
+
+    return true;
+}
+
+void menu_draw(Renderer* r, SDL_Color highlight) {
+    int mx, my;
+    // GetMouse(&mx, &my) havent fully implimented it yet
+
+    for(int i = 0; i < ITEM_COUNT; i++) {
+        SDL_Rect* rect = &items[i].rect;
+
+        // Highlight hovered item
+        SDL_bool hovered = SDL_PointInRect(&(SDL_Point){mx, my}, rect);
+        SDL_SetRenderDrawColor(r->ren,
+            hovered ? 80 : 30,
+            hovered ? 120 : 60,
+            hovered ? 200 : 100,
+            255);
+        SDL_RenderFillRect(r->ren, rect);
+
+        // Border
+        SDL_SetRenderDrawColor(r->ren, 180, 200, 255, 255);
+        SDL_RenderDrawRect(r->ren, rect);
+    }
 }
