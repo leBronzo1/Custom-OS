@@ -54,14 +54,15 @@ int run_loop(Renderer* r) {
 
     SDL_Event e;
     int running = 1;
-    AppState state = STATE_MENU;        // start on menu
+    AppState state = STATE_MENU; // start on menu
     SDL_Color white = {255, 255, 255, 255};
 
     while (running) {
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT) running = 0;
             if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE)
-                state = STATE_MENU;     // escape always goes back
+                state = STATE_MENU; // escape always goes back
+            handle_input(&e, &running);
         }
 
         SDL_SetRenderDrawColor(r->ren, 15, 20, 40, 255);
@@ -74,7 +75,7 @@ int run_loop(Renderer* r) {
 
         switch (state) {
             case STATE_MENU:
-                menu_draw(r, white);    // white unused until hover is done
+                menu_draw(r, white); // white unused until hover is done
                 // draw labels on top of each button
                 draw_text(r, "Games", 350, 215, white);
                 draw_text(r, "Music", 350, 295, white);
@@ -158,8 +159,9 @@ bool draw_text(Renderer* r, const char* text, int x, int y, SDL_Color color) {
 }
 
 void menu_draw(Renderer* r, SDL_Color highlight) {
-    int mx, my;
-    // GetMouse(&mx, &my) havent fully implimented it yet
+    Mouse cstate = mouse_state();
+    int mx = cstate.x;
+    int my = cstate.y;
 
     for(int i = 0; i < ITEM_COUNT; i++) {
         SDL_Rect* rect = &items[i].rect;

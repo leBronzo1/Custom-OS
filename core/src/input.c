@@ -12,3 +12,9 @@ void handle_input(SDL_Event* e, int* running)
         }
     }
 }
+
+Mouse mouse_state(){
+    Mouse cstate;
+    SDL_GetMouseState(&cstate.x, &cstate.y);
+    return cstate;
+}
