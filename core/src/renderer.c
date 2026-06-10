@@ -54,7 +54,7 @@ int run_loop(Renderer* r) {
 
     SDL_Event e;
     int running = 1;
-    AppState state = STATE_MENU; // start on menu
+    AppState state = STATE_MENU;
     SDL_Color white = {255, 255, 255, 255};
 
     while (running) {
@@ -68,14 +68,30 @@ int run_loop(Renderer* r) {
         SDL_SetRenderDrawColor(r->ren, 15, 20, 40, 255);
         SDL_RenderClear(r->ren);
 
-        // Background image drawn first, menu sits on top
+        // Background image drawn first menu sits on top
         if (r->image1) {
             SDL_RenderCopy(r->ren, r->image1, NULL, NULL);
         }
 
         switch (state) {
             case STATE_MENU:
-                menu_draw(r, white); // white unused until hover is done
+                menu_draw(r, white);
+
+                Mouse mouse = mouse_state();
+
+                if (mouse.clicked)
+                {
+                    for (int i = 0; i < ITEM_COUNT; i++)
+                    {
+                        if (SDL_PointInRect(
+                                &(SDL_Point){mouse.x, mouse.y},
+                                &items[i].rect))
+                        {
+                            state = items[i].target;
+                        }
+                    }
+                }
+
                 // draw labels on top of each button
                 draw_text(r, "Games", 350, 215, white);
                 draw_text(r, "Music", 350, 295, white);
@@ -179,4 +195,25 @@ void menu_draw(Renderer* r, SDL_Color highlight) {
         SDL_SetRenderDrawColor(r->ren, 180, 200, 255, 255);
         SDL_RenderDrawRect(r->ren, rect);
     }
+}
+
+void draw_games(Renderer* r) {
+    SDL_Color white = {255,255,255,255};
+
+    draw_text(r, "Games Page", 300, 100, white);
+    draw_text(r, "Your games go here", 250, 180, white);
+}
+
+void draw_music(Renderer* r) {
+    SDL_Color white = {255,255,255,255};
+
+    draw_text(r, "Music Page", 300, 100, white);
+    draw_text(r, "Your albums go here", 250, 180, white);
+}
+
+void draw_books(Renderer* r) {
+    SDL_Color white = {255,255,255,255};
+
+    draw_text(r, "Books Page", 300, 100, white);
+    draw_text(r, "Your library goes here", 250, 180, white);
 }

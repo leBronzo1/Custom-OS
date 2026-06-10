@@ -15,6 +15,13 @@ void handle_input(SDL_Event* e, int* running)
 
 Mouse mouse_state(){
     Mouse cstate;
-    SDL_GetMouseState(&cstate.x, &cstate.y);
+    Uint32 buttons = SDL_GetMouseState(&cstate.x, &cstate.y);
+
+    if (buttons & SDL_BUTTON(SDL_BUTTON_LEFT)) {
+        cstate.clicked = true;
+    } else {
+        cstate.clicked = false;
+    }
+
     return cstate;
 }

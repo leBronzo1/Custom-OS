@@ -53,4 +53,13 @@ bool draw_text(Renderer* r, const char* text, int x, int y, SDL_Color color);
 // Handles menu logic specifically items being highlighted while selected
 void menu_draw(Renderer* r, SDL_Color highlight);
 
+// Draws game menu
+void draw_games(Renderer* r);
+
+// Draw music menu
+void draw_music(Renderer* r);
+
+// Draw book menu
+void draw_books(Renderer* r);
+
 #endif
