@@ -42,7 +42,7 @@ void shutdown_sdl(Renderer* r);
 bool img_load(Renderer* r, const char* path);
 
 // Dead function I lowkey need to delete but I think I use it somewhere and I dont want to fix it
-bool img_init();
+bool img_init(void);
 
 // Delete image
 bool img_kill(Renderer* r);

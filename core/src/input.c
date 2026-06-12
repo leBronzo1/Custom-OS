@@ -7,13 +7,12 @@ void handle_input(SDL_Event* e, int* running)
 
     if (e->type == SDL_KEYDOWN) {
         switch (e->key.keysym.sym) {
-            case SDLK_ESCAPE: *running = 0; break;
             case SDLK_q: *running = 0; break;
         }
     }
 }
 
-Mouse mouse_state(){
+Mouse mouse_state(void){
     Mouse cstate;
     Uint32 buttons = SDL_GetMouseState(&cstate.x, &cstate.y);
 

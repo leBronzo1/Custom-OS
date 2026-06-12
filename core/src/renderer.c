@@ -144,7 +144,7 @@ bool img_load(Renderer* r, const char* path) {
     return true;
 }
 
-bool img_init() {
+bool img_init(void) {
     return true;
 }
 

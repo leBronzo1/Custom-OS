@@ -17,6 +17,6 @@ typedef struct {
 void handle_input(SDL_Event* e, int* running);
 
 // Fetches mouse position and if clicked or not
-Mouse mouse_state();
+Mouse mouse_state(void);
 
 #endif
