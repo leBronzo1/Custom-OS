@@ -1,11 +1,11 @@
 #ifndef AUDIO_H
 #define AUDIO_H
 
-#include <SDL2/SDL_mixer.h>
+#include <SDL_mixer.h>
 
 // Holds a sound effect
 typedef struct {
-    Mix_Chunk *sfx;
+    Mix_Chunk *chunk;
     char name[256];
 } SFX;
 
@@ -59,5 +59,11 @@ void audio_set_sfx_volume(int volume);
  
 // Set volume for music (0–128)
 void audio_set_music_volume(int volume);
+
+// Load and immediately play a music track — caller must free with audio_free_music()
+MusicTrack *audio_play_music_file(const char *path, const char *name, int loops, int fade_ms);
+
+// Load and immediately play a sound effect — caller must free with audio_free_sfx()
+SFX *audio_play_sfx_file(const char *path, const char *name, int volume);
 
 #endif

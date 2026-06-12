@@ -26,8 +26,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    audio_init(44100, 2, 1024);
     int err = run_loop(&renderer);
     error_handling(err);
+    audio_shutdown();
     shutdown_sdl(&renderer);
 
     return 0;
