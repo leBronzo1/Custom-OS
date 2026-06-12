@@ -5,3 +5,4 @@ core/myos
 assets/icons/*.bmp
 *.ttf
 assets/library.json
+*.gba

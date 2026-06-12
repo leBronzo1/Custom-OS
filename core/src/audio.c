@@ -15,8 +15,8 @@ void audio_shutdown(void) {
 int audio_init(int frequency, int channels, int chunksize) {
     // SDL2_mixer supports MP3, OGG, WAV, FLAC, MOD out of the box.
     // MIX_INIT_MP3 | MIX_INIT_OGG covers the most common formats.
-    int flags    = MIX_INIT_MP3 | MIX_INIT_OGG;
-    int initted  = Mix_Init(flags);
+    int flags = MIX_INIT_MP3 | MIX_INIT_OGG;
+    int initted = Mix_Init(flags);
  
     if ((initted & flags) != flags) {
         fprintf(stderr, "[audio] Mix_Init failed: %s\n", Mix_GetError());

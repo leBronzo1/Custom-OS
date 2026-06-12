@@ -8,7 +8,10 @@ chmod +x start.sh
 ./start.sh
 
 Adding Music and Roms:
--Music and roms should be found anywhere on your computer as long as they are on your computer
+-Music and roms should be found on your computer as long as they are in 
 
 Compadibility:
 -Should work on macos or linux systems Windows coming down the road
+
+Controls:
+-Mouse to click and navagate menus escape to go bcak to previous menu and q to

@@ -7,7 +7,7 @@ Outputs a JSON manifest that the C app reads at startup.
 
 Usage:
     python3 library_scanner.py
-    python3 library_scanner.py --music-dir ../assets/sounds --rom-dir ../roms --out ../assets/library.json
+    python3 library_scanner.py --music-dir ../assets/sounds --rom-dir ../assets/roms --out ../assets/library.json
 """
 
 import os
@@ -108,8 +108,8 @@ def scan_roms(rom_dir: Path) -> list[dict]:
 
 def main():
     parser = argparse.ArgumentParser(description="MYOS library scanner")
-    parser.add_argument("--music-dir", default="../assets/sounds",  help="Path to music folder")
-    parser.add_argument("--rom-dir",   default="../roms",            help="Path to ROMs folder")
+    parser.add_argument("--music-dir", default="../assets/sounds",      help="Path to music folder")
+    parser.add_argument("--rom-dir",   default="../assets/roms",         help="Path to ROMs folder")
     parser.add_argument("--out",       default="../assets/library.json", help="Output JSON path")
     args = parser.parse_args()
 
