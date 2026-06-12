@@ -4,3 +4,4 @@ core/myos
 .DS_Store
 assets/icons/*.bmp
 *.ttf
+assets/library.json
