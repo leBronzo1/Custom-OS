@@ -10,6 +10,10 @@ SRC_DIR   = src
 INC_DIR   = include
 BUILD_DIR = build
 
+CJSON_H   = $(INC_DIR)/cJSON.h
+CJSON_C   = $(SRC_DIR)/cJSON.c
+CJSON_URL = https://raw.githubusercontent.com/DaveGamble/cJSON/master
+
 SRCS = $(wildcard $(SRC_DIR)/*.c)
 OBJS = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRCS))
 
@@ -37,7 +41,16 @@ LIBS    = $(SDL_LIBS) $(EXTRA_LIBS)
 # ------------------------------------------------------------------
 # Targets
 # ------------------------------------------------------------------
-all: $(BUILD_DIR) $(OUT)
+all: $(CJSON_H) $(CJSON_C) $(BUILD_DIR) $(OUT)
+
+# Fetch cJSON if missing
+$(CJSON_H):
+	@echo "  fetching cJSON.h..."
+	@curl -fsSL $(CJSON_URL)/cJSON.h -o $@
+
+$(CJSON_C):
+	@echo "  fetching cJSON.c..."
+	@curl -fsSL $(CJSON_URL)/cJSON.c -o $@
 
 $(OUT): $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBS)

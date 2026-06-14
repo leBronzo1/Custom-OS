@@ -5,31 +5,26 @@
 #ifdef __APPLE__
     #include <SDL.h>
     #include <SDL_ttf.h>
-    #include <SDL_image.h>
     #include <SDL_mixer.h>
 #else
     #include <SDL2/SDL.h>
     #include <SDL2/SDL_ttf.h>
-    #include <SDL2/SDL_image.h>
     #include <SDL2/SDL_mixer.h>
 #endif
 
 #include "../include/renderer.h"
-#include "../include/audio.h"
-#include "../include/ipc.h"
 #include "../include/errors.h"
 
 int main(int argc, char* argv[]) {
+    (void)argc;
+    (void)argv;
+
     Renderer renderer = {0};
 
-    if (init_sdl(&renderer) != 0) {
-        return 1;
-    }
+    if (init_sdl(&renderer) != 0) return 1;
 
-    audio_init(44100, 2, 1024);
     int err = run_loop(&renderer);
     error_handling(err);
-    audio_shutdown();
     shutdown_sdl(&renderer);
 
     return 0;

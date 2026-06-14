@@ -29,6 +29,12 @@ typedef struct {
     SDL_Rect    rect;
 } MenuItem;
 
+// Holds a single music track entry from library.json
+typedef struct {
+    char title[256];
+    char file[512];
+} TrackEntry;
+
 // Set up the base SDL window
 int init_sdl(Renderer* r);
 

@@ -4,12 +4,16 @@ A custom media OS built with SDL2.
 
 ## Requirements
 
-- SDL2
-- SDL2_ttf
-- SDL2_mixer
-- mGBA (`brew install mgba` / `sudo apt install libmgba-dev`)
+Install the following before running:
+
+```bash
+brew install sdl2 sdl2_ttf sdl2_mixer mgba
+```
+
 - A `.ttf` font placed at `assets/fonts/myfont.ttf`
 - A background image placed at `assets/icons/fun_times.bmp`
+
+cJSON is fetched automatically on first build — no manual install needed.
 
 ## Running
 
@@ -17,6 +21,8 @@ A custom media OS built with SDL2.
 chmod +x start.sh
 ./start.sh
 ```
+
+This will scan your library, build, and launch the app in one step.
 
 ## Adding Content
 
@@ -26,7 +32,7 @@ chmod +x start.sh
 ## Compatibility
 
 - macOS
-- Linux
+- Linux (`sudo apt install libsdl2-dev libsdl2-ttf-dev libsdl2-mixer-dev libmgba-dev`)
 - Windows support coming soon
 
 ## Controls
