@@ -1,17 +1,37 @@
-Necessary installations (will not run without these things):
--Install SDL2
--Install any font put it in assets/fonts and name it myfont.ttf
--Install a photo to use as a background and name it fun_times.bmp
+# MYOS
 
-To run use: 
+A custom media OS built with SDL2.
+
+## Requirements
+
+- SDL2
+- SDL2_ttf
+- SDL2_mixer
+- mGBA (`brew install mgba` / `sudo apt install libmgba-dev`)
+- A `.ttf` font placed at `assets/fonts/myfont.ttf`
+- A background image placed at `assets/icons/fun_times.bmp`
+
+## Running
+
+```bash
 chmod +x start.sh
 ./start.sh
+```
 
-Adding Music and Roms:
--Music and roms should be found on your computer as long as they are in 
+## Adding Content
 
-Compadibility:
--Should work on macos or linux systems Windows coming down the road
+- Music: drop files into `assets/sounds/` — supported formats: mp3, ogg, wav, flac, opus
+- ROMs: drop files into `assets/roms/` — supported formats: .gba, .nes, .gb, .gbc, .smc, .n64, .md
 
-Controls:
--Mouse to click and navagate menus escape to go bcak to previous menu and q to
+## Compatibility
+
+- macOS
+- Linux
+- Windows support coming soon
+
+## Controls
+
+- Mouse to navigate menus
+- Escape to go back to the previous menu
+- Q to quit
+- GBA controls: arrows to move, Z = B, X = A, A = L, S = R, Enter = Start, Backspace = Select
