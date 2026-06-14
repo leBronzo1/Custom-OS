@@ -29,7 +29,7 @@ ifeq ($(UNAME), Darwin)
 else
     SDL_CFLAGS = $(shell sdl2-config --cflags)
     SDL_LIBS   = $(shell sdl2-config --libs) -lSDL2_ttf -lSDL2_mixer -lmgba
-    EXTRA_LIBS = -lwiringPi -lm
+    EXTRA_LIBS = $(shell pkg-config --libs wiringPi 2>/dev/null) -lm
 endif
 
 # ------------------------------------------------------------------
@@ -43,7 +43,6 @@ LIBS    = $(SDL_LIBS) $(EXTRA_LIBS)
 # ------------------------------------------------------------------
 all: $(CJSON_H) $(CJSON_C) $(BUILD_DIR) $(OUT)
 
-# Fetch cJSON if missing
 $(CJSON_H):
 	@echo "  fetching cJSON.h..."
 	@curl -fsSL $(CJSON_URL)/cJSON.h -o $@
