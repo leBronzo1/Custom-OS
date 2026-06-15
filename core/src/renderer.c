@@ -32,6 +32,8 @@ static int         s_paused        = 0;
 #define PAUSE_BTN_X  ((800 - PAUSE_BTN_W) / 2)
 #define PAUSE_BTN_Y  (600 - PAUSE_BTN_H - 24)
 
+static void music_play_index(int index);
+
 static char *read_file(const char *path) {
     FILE *f = fopen(path, "rb");
     if (!f) return NULL;
@@ -73,6 +75,16 @@ static void music_load_library(void) {
     printf("[music] Loaded %d tracks\n", s_track_count);
 }
 
+static void on_music_finished(void) {
+    if (s_playing_index + 1 < s_track_count) {
+        music_play_index(s_playing_index + 1);
+    } else {
+        if (s_current_track) { audio_free_music(s_current_track); s_current_track = NULL; }
+        s_playing_index = -1;
+        s_paused        = 0;
+    }
+}
+
 static void music_stop_current(void) {
     audio_stop_music(0);
     if (s_current_track) { audio_free_music(s_current_track); s_current_track = NULL; }
@@ -88,7 +100,8 @@ static void music_clear(void) {
 static void music_play_index(int index) {
     if (index < 0 || index >= s_track_count) return;
     music_stop_current();
-    s_current_track = audio_play_music_file(s_tracks[index].file, s_tracks[index].title, -1, 200);
+    Mix_HookMusicFinished(on_music_finished);
+    s_current_track = audio_play_music_file(s_tracks[index].file, s_tracks[index].title, 0, 200);
     s_playing_index = s_current_track ? index : -1;
     s_paused        = 0;
 }
@@ -111,6 +124,7 @@ int init_sdl(Renderer* r) {
     if (!r->font) { printf("Font load error: %s\n", TTF_GetError()); return 5; }
 
     if (audio_init(44100, 2, 1024) != 0) return 6;
+    Mix_HookMusicFinished(on_music_finished);
 
     r->image1 = NULL;
     memset(r->current_cover, 0, sizeof(r->current_cover));
@@ -221,7 +235,6 @@ bool draw_text(Renderer* r, const char* text, int x, int y, SDL_Color color) {
     SDL_Texture* tex = SDL_CreateTextureFromSurface(r->ren, surf);
     SDL_FreeSurface(surf);
     if (!tex) return false;
-    
     int w, h;
     SDL_QueryTexture(tex, NULL, NULL, &w, &h);
     SDL_Rect dst = {x, y, w, h};
