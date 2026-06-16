@@ -27,7 +27,7 @@ This will scan your library, build, and launch the app in one step.
 ## Adding Content
 
 - Music: drop files into `assets/sounds/` — supported formats: mp3, ogg, wav, flac, opus
-- ROMs: drop files into `assets/roms/` — supported formats: .gba, .nes, .gb, .gbc, .smc, .n64, .md
+- ROMs: drop files into `assets/roms/` — supported formats: .gba, .nes, .gb, .gbc, .smc
 
 ## Compatibility
 

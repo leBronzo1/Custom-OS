@@ -2,6 +2,7 @@
 #include "input.h"
 #include "audio.h"
 #include "cJSON.h"
+#include "emulator.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -15,17 +16,32 @@ static MenuItem items[] = {
 static const int ITEM_COUNT = 3;
 
 #define MAX_TRACKS 256
+#define MAX_ROMS   256
 
-static TrackEntry  s_tracks[MAX_TRACKS];
-static int         s_track_count   = 0;
-static int         s_playing_index = -1;
+static TrackEntry s_tracks[MAX_TRACKS];
+static int        s_track_count   = 0;
+static int        s_playing_index = -1;
 static MusicTrack *s_current_track = NULL;
-static int         s_paused        = 0;
+static int        s_paused        = 0;
+
+typedef struct {
+    char title[256];
+    char file[512];
+    char system[64];
+} RomEntry;
+
+static RomEntry s_roms[MAX_ROMS];
+static int      s_rom_count = 0;
 
 #define TRACK_ROW_H  44
 #define TRACK_LIST_X 80
 #define TRACK_LIST_Y 120
 #define TRACK_LIST_W 640
+
+#define ROM_ROW_H  44
+#define ROM_LIST_X 80
+#define ROM_LIST_Y 120
+#define ROM_LIST_W 640
 
 #define PAUSE_BTN_W  160
 #define PAUSE_BTN_H   48
@@ -73,6 +89,35 @@ static void music_load_library(void) {
 
     cJSON_Delete(root);
     printf("[music] Loaded %d tracks\n", s_track_count);
+}
+
+static void games_load_library(void) {
+    s_rom_count = 0;
+    char *json = read_file("../assets/library.json");
+    if (!json) { printf("[games] library.json not found\n"); return; }
+
+    cJSON *root = cJSON_Parse(json);
+    free(json);
+    if (!root) return;
+
+    cJSON *roms = cJSON_GetObjectItem(root, "roms");
+    if (!roms) { cJSON_Delete(root); return; }
+
+    cJSON *entry;
+    cJSON_ArrayForEach(entry, roms) {
+        if (s_rom_count >= MAX_ROMS) break;
+        cJSON *title  = cJSON_GetObjectItem(entry, "title");
+        cJSON *file   = cJSON_GetObjectItem(entry, "file");
+        cJSON *system = cJSON_GetObjectItem(entry, "system");
+        if (!title || !file) continue;
+        strncpy(s_roms[s_rom_count].title,  title->valuestring,  255);
+        strncpy(s_roms[s_rom_count].file,   file->valuestring,   511);
+        strncpy(s_roms[s_rom_count].system, system ? system->valuestring : "Unknown", 63);
+        s_rom_count++;
+    }
+
+    cJSON_Delete(root);
+    printf("[games] Loaded %d ROMs\n", s_rom_count);
 }
 
 static void on_music_finished(void) {
@@ -146,6 +191,7 @@ int run_loop(Renderer* r) {
 
             if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
                 if (state == STATE_MUSIC) music_clear();
+                if (state == STATE_GAMES) s_rom_count = 0;
                 state = STATE_MENU;
             }
 
@@ -165,6 +211,19 @@ int run_loop(Renderer* r) {
                 }
             }
 
+            if (state == STATE_GAMES && e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
+                int mx = e.button.x;
+                int my = e.button.y;
+
+                for (int i = 0; i < s_rom_count; i++) {
+                    SDL_Rect row = {ROM_LIST_X, ROM_LIST_Y + i * ROM_ROW_H, ROM_LIST_W, ROM_ROW_H - 4};
+                    if (SDL_PointInRect(&(SDL_Point){mx, my}, &row)) {
+                        emulator_run(r->ren, s_roms[i].file);
+                        break;
+                    }
+                }
+            }
+
             handle_input(&e, &running);
         }
 
@@ -181,6 +240,7 @@ int run_loop(Renderer* r) {
                         if (SDL_PointInRect(&(SDL_Point){mouse.x, mouse.y}, &items[i].rect)) {
                             state = items[i].target;
                             if (state == STATE_MUSIC) music_load_library();
+                            if (state == STATE_GAMES) games_load_library();
                         }
                     }
                 }
@@ -258,8 +318,32 @@ void menu_draw(Renderer* r, SDL_Color highlight) {
 
 void draw_games(Renderer* r) {
     SDL_Color white = {255, 255, 255, 255};
-    draw_text(r, "Games Page", 300, 100, white);
-    draw_text(r, "Your games go here", 250, 180, white);
+    SDL_Color grey  = {160, 160, 160, 255};
+    SDL_Color green = {100, 220, 100, 255};
+
+    draw_text(r, "Games", ROM_LIST_X, 70, white);
+
+    if (s_rom_count == 0) {
+        draw_text(r, "No ROMs found", ROM_LIST_X, ROM_LIST_Y, grey);
+        return;
+    }
+
+    Mouse m = mouse_state();
+    for (int i = 0; i < s_rom_count; i++) {
+        SDL_Rect row = {ROM_LIST_X, ROM_LIST_Y + i * ROM_ROW_H, ROM_LIST_W, ROM_ROW_H - 4};
+        SDL_bool hovered = SDL_PointInRect(&(SDL_Point){m.x, m.y}, &row);
+
+        if (hovered) SDL_SetRenderDrawColor(r->ren, 30, 80, 50, 255);
+        else         SDL_SetRenderDrawColor(r->ren, 20, 30, 60, 200);
+        SDL_RenderFillRect(r->ren, &row);
+
+        SDL_SetRenderDrawColor(r->ren, 60, 140, 80, 255);
+        SDL_RenderDrawRect(r->ren, &row);
+
+        char label[320];
+        snprintf(label, sizeof(label), "%s  [%s]", s_roms[i].title, s_roms[i].system);
+        draw_text(r, label, ROM_LIST_X + 12, row.y + 10, hovered ? green : white);
+    }
 }
 
 void draw_books(Renderer* r) {

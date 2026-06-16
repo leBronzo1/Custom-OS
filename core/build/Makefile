@@ -15,28 +15,51 @@ CJSON_C   = $(SRC_DIR)/cJSON.c
 CJSON_URL = https://raw.githubusercontent.com/DaveGamble/cJSON/master
 
 SRCS = $(wildcard $(SRC_DIR)/*.c)
-OBJS = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRCS))
+OBJS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SRCS))
 
 # ------------------------------------------------------------------
 # Platform detection
 # ------------------------------------------------------------------
 UNAME := $(shell uname)
 
-ifeq ($(UNAME), Darwin)
+ifeq ($(UNAME),Darwin)
+
+    BREW_PREFIX := $(shell brew --prefix)
+
     SDL_CFLAGS = $(shell sdl2-config --cflags)
-    SDL_LIBS   = $(shell sdl2-config --libs) -lSDL2_ttf -lSDL2_mixer -lmgba
-    EXTRA_LIBS =
+    SDL_LIBS   = $(shell sdl2-config --libs) \
+                 -lSDL2_ttf \
+                 -lSDL2_mixer
+
+    MGBA_CFLAGS = -I$(BREW_PREFIX)/include
+    MGBA_LIBS   = -L$(BREW_PREFIX)/lib -lmgba
+
+    EXTRA_LIBS = -lm
+
 else
+
     SDL_CFLAGS = $(shell sdl2-config --cflags)
-    SDL_LIBS   = $(shell sdl2-config --libs) -lSDL2_ttf -lSDL2_mixer -lmgba
+    SDL_LIBS   = $(shell sdl2-config --libs) \
+                 -lSDL2_ttf \
+                 -lSDL2_mixer \
+                 -lmgba
+
     EXTRA_LIBS = $(shell pkg-config --libs wiringPi 2>/dev/null) -lm
+
+    MGBA_CFLAGS =
+    MGBA_LIBS   =
+
 endif
 
 # ------------------------------------------------------------------
-# Flags
+# Compiler / linker flags
 # ------------------------------------------------------------------
-CFLAGS  = -Wall -Wextra -O2 -std=c11 -I$(INC_DIR) $(SDL_CFLAGS)
-LIBS    = $(SDL_LIBS) $(EXTRA_LIBS)
+CFLAGS = -Wall -Wextra -O2 -std=c11 \
+          -I$(INC_DIR) \
+          $(SDL_CFLAGS) \
+          $(MGBA_CFLAGS)
+
+LIBS = $(SDL_LIBS) $(MGBA_LIBS) $(EXTRA_LIBS)
 
 # ------------------------------------------------------------------
 # Targets
@@ -57,7 +80,7 @@ $(OUT): $(OBJS)
 	@echo "  built: $(OUT)"
 	@echo ""
 
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR):

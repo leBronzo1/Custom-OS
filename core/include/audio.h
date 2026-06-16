@@ -16,7 +16,7 @@ typedef struct {
 } MusicTrack;
 
 // Call once after SDL_Init() — frequency: 44100, channels: 1 (mono) 2 (stereo), chunksize: 512/1024/2048
-int  audio_init(int frequency, int channels, int chunksize);
+int audio_init(int frequency, int channels, int chunksize);
  
 // Shutdown and free all mixer resources
 void audio_shutdown(void);

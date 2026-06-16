@@ -6,6 +6,7 @@ assets/icons/*.bmp
 *.ttf
 assets/library.json
 *.gba
+*.gba.state
 *.mp3
 core/include/cJSON.h
 core/src/cJSON.c
