@@ -218,7 +218,22 @@ int run_loop(Renderer* r) {
                 for (int i = 0; i < s_rom_count; i++) {
                     SDL_Rect row = {ROM_LIST_X, ROM_LIST_Y + i * ROM_ROW_H, ROM_LIST_W, ROM_ROW_H - 4};
                     if (SDL_PointInRect(&(SDL_Point){mx, my}, &row)) {
+                        /*
+                         * Stop any playing music before launching the emulator.
+                         * SDL_mixer holds the audio device; the emulator opens its
+                         * own raw SDL audio device, so the two conflict if mixer is
+                         * still active. music_stop_current() releases the mixer
+                         * track; emulator.c then calls Mix_PauseMusic/ResumeMusic
+                         * around its own audio device lifetime.
+                         */
+                        music_stop_current();
                         emulator_run(r->ren, s_roms[i].file);
+                        /*
+                         * Re-hook the finished callback after returning from the
+                         * emulator, since Mix_HookMusicFinished may have been
+                         * reset during the emulator session.
+                         */
+                        Mix_HookMusicFinished(on_music_finished);
                         break;
                     }
                 }

@@ -8,6 +8,7 @@
 #include <mgba/core/input.h>
 #include <mgba/core/blip_buf.h>
 #include <mgba/core/serialize.h>
+#include <SDL_mixer.h>
 
 /*
 GBA Section
