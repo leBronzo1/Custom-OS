@@ -23,7 +23,7 @@ int audio_init(int frequency, int channels, int chunksize) {
         // Non-fatal: WAV still works without these flags
     }
  
-    if (Mix_OpenAudio(frequency, MIX_DEFAULT_FORMAT, channels, chunksize) < 0) {
+    if (Mix_OpenAudio(frequency, AUDIO_S16SYS, channels, chunksize) < 0) {
         fprintf(stderr, "[audio] Mix_OpenAudio failed: %s\n", Mix_GetError());
         return -1;
     }
