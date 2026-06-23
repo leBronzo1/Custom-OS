@@ -220,18 +220,18 @@ int run_loop(Renderer* r) {
                     if (SDL_PointInRect(&(SDL_Point){mx, my}, &row)) {
                         /*
                          * Stop any playing music before launching the emulator.
-                         * SDL_mixer holds the audio device; the emulator opens its
-                         * own raw SDL audio device, so the two conflict if mixer is
-                         * still active. music_stop_current() releases the mixer
-                         * track; emulator.c then calls Mix_PauseMusic/ResumeMusic
-                         * around its own audio device lifetime.
+                         * SDL_mixer holds the audio device; the emulator now
+                         * opens its own separate raw SDL audio device, so the
+                         * two no longer conflict, but pausing the menu music
+                         * during gameplay is still the desired UX.
                          */
                         music_stop_current();
                         emulator_run(r->ren, s_roms[i].file);
                         /*
                          * Re-hook the finished callback after returning from the
-                         * emulator, since Mix_HookMusicFinished may have been
-                         * reset during the emulator session.
+                         * emulator. The emulator no longer touches SDL_mixer at
+                         * all, so this hook was never actually cleared — but we
+                         * keep the re-hook here defensively in case that changes.
                          */
                         Mix_HookMusicFinished(on_music_finished);
                         break;

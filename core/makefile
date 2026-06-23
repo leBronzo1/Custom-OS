@@ -1,6 +1,6 @@
 # ------------------------------------------------------------------
 # myos Makefile
-# Run from core/ with: make -f build/Makefile run
+# Run from core/ with: make run
 # ------------------------------------------------------------------
 
 CC      = gcc
@@ -16,6 +16,7 @@ CJSON_URL = https://raw.githubusercontent.com/DaveGamble/cJSON/master
 
 SRCS = $(wildcard $(SRC_DIR)/*.c)
 OBJS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SRCS))
+DEPS = $(OBJS:.o=.d)
 
 # ------------------------------------------------------------------
 # Platform detection
@@ -55,6 +56,7 @@ endif
 # Compiler / linker flags
 # ------------------------------------------------------------------
 CFLAGS = -Wall -Wextra -O2 -std=c11 \
+          -MMD -MP \
           -I$(INC_DIR) \
           $(SDL_CFLAGS) \
           $(MGBA_CFLAGS)
@@ -91,5 +93,7 @@ run: all
 
 clean:
 	rm -rf $(BUILD_DIR) $(OUT)
+
+-include $(DEPS)
 
 .PHONY: all run clean

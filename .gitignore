@@ -10,3 +10,4 @@ assets/library.json
 *.mp3
 core/include/cJSON.h
 core/src/cJSON.c
+*.d

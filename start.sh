@@ -9,4 +9,4 @@ python3 services/library_scanner.py \
     --out       assets/library.json
  
 echo "[myos] Building..."
-cd core && make -f build/Makefile run
+cd core && make run 2>&1 | grep -E "\[emu|\[audio"
