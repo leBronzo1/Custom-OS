@@ -27,16 +27,16 @@ ROM_EXTENSIONS = {
 }
 
 ROM_SYSTEM_MAP = {
-    ".nes":  "NES",
-    ".gb":   "Game Boy",
-    ".gbc":  "Game Boy Color",
-    ".gba":  "Game Boy Advance",
-    ".smc":  "SNES",
-    ".sfc":  "SNES",
-    ".n64":  "Nintendo 64",
-    ".z64":  "Nintendo 64",
-    ".md":   "Mega Drive",
-    ".gen":  "Mega Drive",
+    ".nes": "NES",
+    ".gb": "Game Boy",
+    ".gbc": "Game Boy Color",
+    ".gba": "Game Boy Advance",
+    ".smc": "SNES",
+    ".sfc": "SNES",
+    ".n64": "Nintendo 64",
+    ".z64": "Nintendo 64",
+    ".md": "Mega Drive",
+    ".gen": "Mega Drive",
 }
 
 def file_hash(path: Path) -> str:
@@ -54,11 +54,11 @@ def scan_music(music_dir: Path) -> list[dict]:
         if path.suffix.lower() not in MUSIC_EXTENSIONS:
             continue
         entries.append({
-            "type":   "music",
-            "title":  path.stem.replace("_", " ").title(),
-            "file":   "../" + str(path),
+            "type": "music",
+            "title": path.stem.replace("_", " ").title(),
+            "file": "../" + str(path),
             "format": path.suffix.lstrip(".").upper(),
-            "hash":   file_hash(path),
+            "hash": file_hash(path),
         })
         print(f"[scanner] music  → {path.name}")
     return entries
@@ -73,31 +73,31 @@ def scan_roms(rom_dir: Path) -> list[dict]:
         if ext not in ROM_EXTENSIONS:
             continue
         entries.append({
-            "type":   "rom",
-            "title":  path.stem.replace("_", " ").title(),
-            "file":   "../" + str(path),
+            "type": "rom",
+            "title": path.stem.replace("_", " ").title(),
+            "file": "../" + str(path),
             "system": ROM_SYSTEM_MAP.get(ext, "Unknown"),
-            "hash":   file_hash(path),
+            "hash": file_hash(path),
         })
         print(f"[scanner] rom    → {path.name}  ({ROM_SYSTEM_MAP.get(ext, '?')})")
     return entries
 
 def main():
     parser = argparse.ArgumentParser(description="MYOS library scanner")
-    parser.add_argument("--music-dir", default="assets/sounds",      help="Path to music folder")
-    parser.add_argument("--rom-dir",   default="assets/roms",         help="Path to ROMs folder")
-    parser.add_argument("--out",       default="assets/library.json", help="Output JSON path")
+    parser.add_argument("--music-dir", default="assets/sounds", help="Path to music folder")
+    parser.add_argument("--rom-dir", default="assets/roms", help="Path to ROMs folder")
+    parser.add_argument("--out", default="assets/library.json", help="Output JSON path")
     args = parser.parse_args()
 
     music_dir = Path(args.music_dir)
-    rom_dir   = Path(args.rom_dir)
-    out_path  = Path(args.out)
+    rom_dir = Path(args.rom_dir)
+    out_path = Path(args.out)
 
     print(f"[scanner] Scanning music: {music_dir}")
-    print(f"[scanner] Scanning ROMs:  {rom_dir}")
+    print(f"[scanner] Scanning ROMs: {rom_dir}")
 
     music = scan_music(music_dir)
-    roms  = scan_roms(rom_dir)
+    roms = scan_roms(rom_dir)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w") as f:

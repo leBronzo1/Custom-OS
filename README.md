@@ -8,6 +8,8 @@ Install the following before running:
 
 ```bash
 brew install sdl2 sdl2_ttf sdl2_mixer mgba
+brew install python3
+pip install psutil
 ```
 
 - A `.ttf` font placed at `assets/fonts/myfont.ttf`

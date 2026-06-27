@@ -57,7 +57,10 @@ static char *read_file(const char *path) {
     long len = ftell(f);
     rewind(f);
     char *buf = malloc(len + 1);
-    if (!buf) { fclose(f); return NULL; }
+    if (!buf) { 
+        fclose(f); 
+        return NULL; 
+    }
     fread(buf, 1, len, f);
     buf[len] = '\0';
     fclose(f);
@@ -317,7 +320,7 @@ void shutdown_sdl(Renderer* r) {
     TTF_Quit();
     SDL_DestroyRenderer(r->ren);
     SDL_DestroyWindow(r->win);
-    
+
     SDL_Quit();
 }
 
