@@ -9,13 +9,15 @@ Install the following before running:
 ```bash
 brew install sdl2 sdl2_ttf sdl2_mixer mgba
 brew install python3
-pip install psutil
+pip install -r requirements.txt
 ```
+
+cJSON is fetched automatically on first build — no manual install needed.
+
+### Assets
 
 - A `.ttf` font placed at `assets/fonts/myfont.ttf`
 - A background image placed at `assets/icons/fun_times.bmp`
-
-cJSON is fetched automatically on first build — no manual install needed.
 
 ## Running
 
@@ -39,7 +41,20 @@ This will scan your library, build, and launch the app in one step.
 
 ## Controls
 
-- Mouse to navigate menus
-- Escape to go back to the previous menu
-- Q to quit
-- GBA controls: arrows to move, Z = B, X = A, A = L, S = R, Enter = Start, Backspace = Select
+| Key | Action |
+|-----|--------|
+| Mouse | Navigate menus |
+| Escape | Back to previous menu |
+| Q | Quit |
+
+### GBA Controls
+
+| Key | Action |
+|-----|--------|
+| Arrow keys | Move |
+| Z | B |
+| X | A |
+| A | L |
+| S | R |
+| Enter | Start |
+| Backspace | Select |
