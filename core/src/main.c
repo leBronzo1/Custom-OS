@@ -28,9 +28,19 @@ int main(int argc, char* argv[]) {
     error_handling(err);
     shutdown_sdl(&renderer);
 
-    // calm little test
+    // Example of what to do when building system monitor GUI
     python_bridge_init();
-    python_bridge_get_system_info();
+    char *info = python_bridge_get_system_info();
+    if (info) {
+        FILE *f = fopen("../system_info.json", "w");
+        if (f) {
+            fputs(info, f);
+            fclose(f);
+        } else {
+            perror("fopen");
+        }
+        free(info);
+    }
 
     return 0;
 }
