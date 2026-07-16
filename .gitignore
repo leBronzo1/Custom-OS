@@ -13,5 +13,4 @@ core/src/cJSON.c
 *.d
 __pycache__/
 *.pyc
-system_info.json
-.env
+core/system_info.json
