@@ -19,6 +19,12 @@ OBJS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SRCS))
 DEPS = $(OBJS:.o=.d)
 
 # ------------------------------------------------------------------
+# Python
+# ------------------------------------------------------------------
+PY_CFLAGS = $(shell python3-config --cflags)
+PY_LIBS   = $(shell python3-config --embed --ldflags 2>/dev/null || python3-config --ldflags)
+
+# ------------------------------------------------------------------
 # Platform detection
 # ------------------------------------------------------------------
 UNAME := $(shell uname)
@@ -59,9 +65,13 @@ CFLAGS = -Wall -Wextra -O2 -std=c11 \
           -MMD -MP \
           -I$(INC_DIR) \
           $(SDL_CFLAGS) \
-          $(MGBA_CFLAGS)
+          $(MGBA_CFLAGS) \
+          $(PY_CFLAGS)
 
-LIBS = $(SDL_LIBS) $(MGBA_LIBS) $(EXTRA_LIBS)
+LIBS = $(SDL_LIBS) \
+       $(MGBA_LIBS) \
+       $(EXTRA_LIBS) \
+       $(PY_LIBS)
 
 # ------------------------------------------------------------------
 # Targets

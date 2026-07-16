@@ -14,6 +14,7 @@
 
 #include "../include/renderer.h"
 #include "../include/errors.h"
+#include "../include/python_bridge.h"
 
 int main(int argc, char* argv[]) {
     (void)argc;
@@ -26,6 +27,10 @@ int main(int argc, char* argv[]) {
     int err = run_loop(&renderer);
     error_handling(err);
     shutdown_sdl(&renderer);
+
+    // calm little test
+    python_bridge_init();
+    python_bridge_get_system_info();
 
     return 0;
 }

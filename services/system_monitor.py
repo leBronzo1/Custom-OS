@@ -1,3 +1,4 @@
+import json
 import time
 import psutil
 
@@ -34,18 +35,17 @@ def get_boot_time():
 def get_current_time():
     return time.strftime("%Y-%m-%d %H:%M:%S")
 
-def system_info():
-    cpu = get_cpu_data()
-    memory = get_memory_data()
-    disk = get_disk_data()
+def system_info_json():
+    """Return all system information as a JSON string."""
+    data = {
+        "current_time": get_current_time(),
+        "boot_time": get_boot_time(),
+        "cpu": get_cpu_data(),
+        "memory": get_memory_data(),
+        "disk": get_disk_data()
+    }
 
-    print(f"Current Time: {get_current_time()}")
-    print(f"Boot Time: {get_boot_time()}")
+    return json.dumps(data, indent=4)
 
-    print(f"CPU Cores: {cpu['cores']}")
-    print(f"CPU Usage: {cpu['usage']}%")
-
-    print(f"Memory: {memory['percent']}%")
-    print(f"Disk: {disk['percent']}%")
-
-system_info()
+if __name__ == "__main__":
+    print(system_info_json())
