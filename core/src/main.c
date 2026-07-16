@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
     python_bridge_init();
     char *info = python_bridge_get_system_info();
     if (info) {
-        FILE *f = fopen("../system_info.json", "w");
+        FILE *f = fopen("../core/system_info.json", "w");
         if (f) {
             fputs(info, f);
             fclose(f);

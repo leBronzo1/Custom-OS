@@ -9,8 +9,34 @@ Install the following before running:
 ```bash
 brew install sdl2 sdl2_ttf sdl2_mixer mgba
 brew install python3
+```
+
+### Python environment (important)
+
+`myos` embeds a Python interpreter at build time (linked via `python3-config`)
+to run `services/system_monitor.py`. Because of this, the virtual environment
+**must** be created with the exact same Python version the binary is linked
+against, or third-party packages like `psutil` will fail to import even
+though they're installed, compiled extensions are tied to a specific
+Python ABI/version.
+
+Check which version your build links against:
+
+```bash
+python3-config --cflags
+```
+
+Then create the venv with that same version (adjust `python3.14` below to
+match):
+
+```bash
+python3.14 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
+
+If you ever upgrade your system Python or rebuild against a different
+version, delete and recreate `.venv` to match.
 
 cJSON is fetched automatically on first build — no manual install needed.
 

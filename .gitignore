@@ -11,3 +11,7 @@ assets/library.json
 core/include/cJSON.h
 core/src/cJSON.c
 *.d
+__pycache__/
+*.pyc
+system_info.json
+.env
