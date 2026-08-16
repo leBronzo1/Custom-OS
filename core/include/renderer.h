@@ -19,7 +19,8 @@ typedef enum {
     STATE_MENU,
     STATE_GAMES,
     STATE_MUSIC,
-    STATE_BOOKS
+    STATE_BOOKS,
+    STATE_MONITOR
 } AppState;
 
 // Defines current application state
@@ -34,6 +35,20 @@ typedef struct {
     char title[256];
     char file[512];
 } TrackEntry;
+
+// Holds system info
+typedef struct {
+    int cores;
+    double cpu_percent;
+    double ram_total_gib;
+    double ram_used_gib;
+    double ram_percent;
+    double disk_total_gib;
+    double disk_used_gib;
+    double disk_percent;
+    char date[20];
+    char bootTime[20];
+} SysInfo;
 
 // Set up the base SDL window
 int init_sdl(Renderer* r);
@@ -67,5 +82,8 @@ void draw_music(Renderer* r);
 
 // Draw book menu
 void draw_books(Renderer* r);
+
+// Draw the system monitor screen.
+void draw_monitor(Renderer* r);
 
 #endif

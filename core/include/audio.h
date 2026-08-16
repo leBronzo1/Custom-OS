@@ -20,6 +20,12 @@ int audio_init(int frequency, int channels, int chunksize);
  
 // Shutdown and free all mixer resources
 void audio_shutdown(void);
+
+// Release SDL_mixer's audio device while the emulator owns SDL audio.
+int audio_suspend_for_emulator(void);
+
+// Reopen SDL_mixer's audio device after the emulator exits.
+int audio_resume_after_emulator(void);
  
 // Load a sound effect from a file path, name it for debugging — caller must free with audio_free_sfx()
 SFX *audio_load_sfx(const char *path, const char *name);

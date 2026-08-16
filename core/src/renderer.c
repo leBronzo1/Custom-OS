@@ -3,6 +3,7 @@
 #include "audio.h"
 #include "cJSON.h"
 #include "emulator.h"
+#include "python_bridge.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -11,9 +12,10 @@ static MenuItem items[] = {
     { "Games", STATE_GAMES, {300, 200, 200, 60} },
     { "Music", STATE_MUSIC, {300, 280, 200, 60} },
     { "Books", STATE_BOOKS, {300, 360, 200, 60} },
+    { "Monitor", STATE_MONITOR, {300, 440, 200, 60} },
 };
 
-static const int ITEM_COUNT = 3;
+static const int ITEM_COUNT = 4;
 
 #define MAX_TRACKS 256
 #define MAX_ROMS 256
@@ -32,6 +34,8 @@ typedef struct {
 
 static RomEntry s_roms[MAX_ROMS];
 static int s_rom_count = 0;
+static SysInfo s_system_info;
+static char s_monitor_error[160];
 
 #define TRACK_ROW_H 44
 #define TRACK_LIST_X 80
@@ -47,6 +51,11 @@ static int s_rom_count = 0;
 #define PAUSE_BTN_H 48
 #define PAUSE_BTN_X ((800 - PAUSE_BTN_W) / 2)
 #define PAUSE_BTN_Y (600 - PAUSE_BTN_H - 24)
+
+#define REFRESH_BTN_W 160
+#define REFRESH_BTN_H 48
+#define REFRESH_BTN_X ((800 - REFRESH_BTN_W) / 2)
+#define REFRESH_BTN_Y (600 - REFRESH_BTN_H - 24)
 
 static void music_play_index(int index);
 
@@ -131,6 +140,73 @@ static void games_load_library(void) {
     printf("[games] Loaded %d ROMs\n", s_rom_count);
 }
 
+static int json_number(cJSON *object, const char *name, double *out) {
+    cJSON *value = cJSON_GetObjectItem(object, name);
+    if (!cJSON_IsNumber(value)) return 0;
+    *out = value->valuedouble;
+    return 1;
+}
+
+static int json_string(cJSON *object, const char *name, char *out, size_t out_size) {
+    cJSON *value = cJSON_GetObjectItem(object, name);
+    if (!cJSON_IsString(value) || !value->valuestring) return 0;
+    snprintf(out, out_size, "%s", value->valuestring);
+    return 1;
+}
+
+static void monitor_refresh(void) {
+    memset(&s_system_info, 0, sizeof(s_system_info));
+    s_monitor_error[0] = '\0';
+
+    if (!python_bridge_init()) {
+        snprintf(s_monitor_error, sizeof(s_monitor_error), "Could not start the Python monitor.");
+        return;
+    }
+
+    char *json = python_bridge_get_system_info();
+    if (!json) {
+        snprintf(s_monitor_error, sizeof(s_monitor_error), "Could not read system information.");
+        return;
+    }
+
+    cJSON *root = cJSON_Parse(json);
+    free(json);
+    if (!root) {
+        snprintf(s_monitor_error, sizeof(s_monitor_error), "Python returned invalid monitor data.");
+        return;
+    }
+
+    cJSON *cpu = cJSON_GetObjectItem(root, "cpu");
+    cJSON *memory = cJSON_GetObjectItem(root, "memory");
+    cJSON *disk = cJSON_GetObjectItem(root, "disk");
+    double cores = 0;
+    double memory_total = 0, memory_used = 0;
+    double disk_total = 0, disk_used = 0;
+    int valid = cJSON_IsObject(cpu) && cJSON_IsObject(memory) && cJSON_IsObject(disk)
+        && json_number(cpu, "cores", &cores)
+        && json_number(cpu, "usage", &s_system_info.cpu_percent)
+        && json_number(memory, "total", &memory_total)
+        && json_number(memory, "used", &memory_used)
+        && json_number(memory, "percent", &s_system_info.ram_percent)
+        && json_number(disk, "total", &disk_total)
+        && json_number(disk, "used", &disk_used)
+        && json_number(disk, "percent", &s_system_info.disk_percent)
+        && json_string(root, "current_time", s_system_info.date, sizeof(s_system_info.date))
+        && json_string(root, "boot_time", s_system_info.bootTime, sizeof(s_system_info.bootTime));
+
+    if (valid) {
+        s_system_info.cores = (int)cores;
+        s_system_info.ram_total_gib = memory_total / (1024.0 * 1024.0 * 1024.0);
+        s_system_info.ram_used_gib = memory_used / (1024.0 * 1024.0 * 1024.0);
+        s_system_info.disk_total_gib = disk_total / (1024.0 * 1024.0 * 1024.0);
+        s_system_info.disk_used_gib = disk_used / (1024.0 * 1024.0 * 1024.0);
+    } else {
+        memset(&s_system_info, 0, sizeof(s_system_info));
+        snprintf(s_monitor_error, sizeof(s_monitor_error), "Python returned incomplete monitor data.");
+    }
+    cJSON_Delete(root);
+}
+
 static void on_music_finished(void) {
     if (s_playing_index + 1 < s_track_count) {
         music_play_index(s_playing_index + 1);
@@ -146,6 +222,7 @@ static void on_music_finished(void) {
 }
 
 static void music_stop_current(void) {
+    Mix_HookMusicFinished(NULL);
     audio_stop_music(0);
     if (s_current_track) { audio_free_music(s_current_track); s_current_track = NULL; }
     s_playing_index = -1;
@@ -254,24 +331,24 @@ int run_loop(Renderer* r) {
                 for (int i = 0; i < s_rom_count; i++) {
                     SDL_Rect row = {ROM_LIST_X, ROM_LIST_Y + i * ROM_ROW_H, ROM_LIST_W, ROM_ROW_H - 4};
                     if (SDL_PointInRect(&(SDL_Point){mx, my}, &row)) {
-                        /*
-                         * Stop any playing music before launching the emulator.
-                         * SDL_mixer holds the audio device; the emulator now
-                         * opens its own separate raw SDL audio device, so the
-                         * two no longer conflict, but pausing the menu music
-                         * during gameplay is still the desired UX.
-                         */
+                        /* SDL_mixer and mGBA cannot reliably share a device
+                           on every SDL backend, so give the emulator exclusive
+                           ownership while a ROM is running. */
                         music_stop_current();
-                        emulator_run(r->ren, s_roms[i].file);
-                        /*
-                         * Re-hook the finished callback after returning from the
-                         * emulator. The emulator no longer touches SDL_mixer at
-                         * all, so this hook was never actually cleared — but we
-                         * keep the re-hook here defensively in case that changes.
-                         */
-                        Mix_HookMusicFinished(on_music_finished);
+                        if (audio_suspend_for_emulator() == 0) {
+                            emulator_run(r->ren, s_roms[i].file);
+                        }
+                        if (audio_resume_after_emulator() == 0)
+                            Mix_HookMusicFinished(on_music_finished);
                         break;
                     }
+                }
+            }
+
+            if (state == STATE_MONITOR && e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
+                SDL_Rect refresh_btn = {REFRESH_BTN_X, REFRESH_BTN_Y, REFRESH_BTN_W, REFRESH_BTN_H};
+                if (SDL_PointInRect(&(SDL_Point){e.button.x, e.button.y}, &refresh_btn)) {
+                    monitor_refresh();
                 }
             }
 
@@ -292,17 +369,20 @@ int run_loop(Renderer* r) {
                             state = items[i].target;
                             if (state == STATE_MUSIC) music_load_library();
                             if (state == STATE_GAMES) games_load_library();
+                            if (state == STATE_MONITOR) monitor_refresh();
                         }
                     }
                 }
                 draw_text(r, "Games", 350, 215, white);
                 draw_text(r, "Music", 350, 295, white);
                 draw_text(r, "Books", 350, 375, white);
+                draw_text(r, "Monitor", 335, 455, white);
                 break;
             }
             case STATE_GAMES: draw_games(r); break;
             case STATE_MUSIC: draw_music(r); break;
             case STATE_BOOKS: draw_books(r); break;
+            case STATE_MONITOR: draw_monitor(r); break;
         }
 
         SDL_RenderPresent(r->ren);
@@ -313,6 +393,7 @@ int run_loop(Renderer* r) {
 
 void shutdown_sdl(Renderer* r) {
     music_clear();
+    python_bridge_shutdown();
     audio_shutdown();
     img_kill(r);
 
@@ -417,6 +498,36 @@ void draw_books(Renderer* r) {
     SDL_Color white = {255, 255, 255, 255};
     draw_text(r, "Books Page", 300, 100, white);
     draw_text(r, "Your library goes here", 250, 180, white);
+}
+
+void draw_monitor(Renderer* r) {
+    SDL_Color white = {255, 255, 255, 255};
+    char line[128];
+
+    draw_text(r, "System Monitor", 80, 55, white);
+    if (s_monitor_error[0]) {
+        draw_text(r, s_monitor_error, 80, 120, white);
+    } else {
+        snprintf(line, sizeof(line), "CPU: %.1f%%  (%d cores)", s_system_info.cpu_percent, s_system_info.cores);
+        draw_text(r, line, 80, 120, white);
+        snprintf(line, sizeof(line), "Memory: %.1f / %.1f GiB  (%.1f%%)", s_system_info.ram_used_gib, s_system_info.ram_total_gib, s_system_info.ram_percent);
+        draw_text(r, line, 80, 175, white);
+        snprintf(line, sizeof(line), "Disk: %.1f / %.1f GiB  (%.1f%%)", s_system_info.disk_used_gib, s_system_info.disk_total_gib, s_system_info.disk_percent);
+        draw_text(r, line, 80, 230, white);
+        snprintf(line, sizeof(line), "Time: %s", s_system_info.date);
+        draw_text(r, line, 80, 285, white);
+        snprintf(line, sizeof(line), "Boot time: %s", s_system_info.bootTime);
+        draw_text(r, line, 80, 340, white);
+    }
+
+    SDL_Rect refresh_btn = {REFRESH_BTN_X, REFRESH_BTN_Y, REFRESH_BTN_W, REFRESH_BTN_H};
+    Mouse mouse = mouse_state();
+    SDL_bool hovered = SDL_PointInRect(&(SDL_Point){mouse.x, mouse.y}, &refresh_btn);
+    SDL_SetRenderDrawColor(r->ren, hovered ? 80 : 30, hovered ? 120 : 60, hovered ? 200 : 100, 255);
+    SDL_RenderFillRect(r->ren, &refresh_btn);
+    SDL_SetRenderDrawColor(r->ren, 180, 200, 255, 255);
+    SDL_RenderDrawRect(r->ren, &refresh_btn);
+    draw_text(r, "Refresh", REFRESH_BTN_X + 35, REFRESH_BTN_Y + 12, white);
 }
 
 void draw_music(Renderer* r) {

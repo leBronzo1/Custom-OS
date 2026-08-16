@@ -4,12 +4,58 @@
 #include <stdlib.h>
 #include <string.h>
 
+static int s_frequency = 0;
+static int s_channels = 0;
+static int s_chunksize = 0;
+static int s_mixer_open = 0;
+
+static int audio_open_mixer(void) {
+    if (s_mixer_open) return 0;
+
+    if (Mix_OpenAudio(s_frequency, AUDIO_S16SYS, s_channels, s_chunksize) < 0) {
+        fprintf(stderr, "[audio] Mix_OpenAudio failed: %s\n", Mix_GetError());
+        return -1;
+    }
+
+    Mix_AllocateChannels(16);
+    s_mixer_open = 1;
+    return 0;
+}
+
 void audio_shutdown(void) {
-    Mix_HaltMusic();
-    Mix_HaltChannel(-1); // stop all sfx channels -1 halts all
-    Mix_CloseAudio();
+    Mix_HookMusicFinished(NULL);
+    if (s_mixer_open) {
+        Mix_HaltMusic();
+        Mix_HaltChannel(-1); // channel -1 halts all sound effects
+        Mix_CloseAudio();
+        s_mixer_open = 0;
+    }
     Mix_Quit();
     printf("[audio] Shutdown complete.\n");
+}
+
+int audio_suspend_for_emulator(void) {
+    if (!s_mixer_open) return 0;
+
+    /* Closing the mixer can invoke its completion callback, so detach it
+       before releasing the one playback device used by SDL2_mixer. */
+    Mix_HookMusicFinished(NULL);
+    Mix_HaltMusic();
+    Mix_HaltChannel(-1);
+    Mix_CloseAudio();
+    s_mixer_open = 0;
+    printf("[audio] Released SDL_mixer device for emulator.\n");
+    return 0;
+}
+
+int audio_resume_after_emulator(void) {
+    if (audio_open_mixer() < 0) {
+        fprintf(stderr, "[audio] Could not reclaim the audio device after emulator.\n");
+        return -1;
+    }
+
+    printf("[audio] Reopened SDL_mixer device after emulator.\n");
+    return 0;
 }
 
 int audio_init(int frequency, int channels, int chunksize) {
@@ -23,13 +69,14 @@ int audio_init(int frequency, int channels, int chunksize) {
         // Non-fatal: WAV still works without these flags
     }
 
-    if (Mix_OpenAudio(frequency, AUDIO_S16SYS, channels, chunksize) < 0) {
-        fprintf(stderr, "[audio] Mix_OpenAudio failed: %s\n", Mix_GetError());
+    s_frequency = frequency;
+    s_channels = channels;
+    s_chunksize = chunksize;
+
+    if (audio_open_mixer() < 0) {
+        Mix_Quit();
         return -1;
     }
-
-    // Allocate 16 mixing channels for simultaneous sound effects
-    Mix_AllocateChannels(16);
 
     printf("[audio] Initialised  freq=%d  channels=%d  chunksize=%d\n",frequency, channels, chunksize);
     return 0;

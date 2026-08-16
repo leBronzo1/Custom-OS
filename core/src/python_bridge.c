@@ -108,6 +108,8 @@ static void add_venv_site_packages_to_syspath(const char *exe_dir) {
 }
 
 int python_bridge_init(void) {
+    if (gFunction) return 1;
+
     Py_Initialize();
 
     PyRun_SimpleString("import sys");
@@ -122,6 +124,7 @@ int python_bridge_init(void) {
 
     if (!gModule) {
         PyErr_Print();
+        python_bridge_shutdown();
         return 0;
     }
 
@@ -133,6 +136,7 @@ int python_bridge_init(void) {
         gFunction = NULL;
         Py_XDECREF(gModule);
         gModule = NULL;
+        python_bridge_shutdown();
         return 0;
     }
 

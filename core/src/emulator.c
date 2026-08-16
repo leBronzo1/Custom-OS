@@ -1,19 +1,22 @@
 #include "emulator.h"
-#include "audio.h"
 #include <mgba/core/input.h>
 #include <mgba/internal/gba/input.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <fcntl.h>
 
-#define AUDIO_BUFFER_SIZE 4096   /* int16_t elements, interleaved L/R */
-#define EMU_SAMPLE_RATE   44100
-#define EMU_MAX_QUEUED_MS 100    /* cap queued audio latency/backlog */
+#define AUDIO_BUFFER_FRAMES 2048
+#define EMU_SAMPLE_RATE 44100
+#define EMU_DEVICE_FRAMES 1024
+#define EMU_TARGET_QUEUED_MS 25
+#define EMU_MAX_QUEUED_MS 100
 
 static struct mCore      *s_core      = NULL;
 static void               *s_video_buf = NULL;
 static int16_t            *s_audio_buf = NULL;
 static SDL_AudioDeviceID   s_audio_dev = 0;
+static int                 s_audio_rate = EMU_SAMPLE_RATE;
 
 /*
  * The emulator needs to stream continuously-generated PCM, not play
@@ -24,87 +27,66 @@ static SDL_AudioDeviceID   s_audio_dev = 0;
  * copy the buffer it's given, so freeing/reusing that buffer next frame
  * races with SDL_mixer's audio thread.
  *
- * Instead we open a dedicated raw SDL audio device for the emulator and
- * feed it via SDL_QueueAudio, which is SDL's actual streaming primitive:
- * it copies the bytes into its own internal FIFO immediately and an
- * audio thread drains it continuously. This runs completely separately
- * from SDL_mixer, so there's no fighting over the audio device or a
- * single mixer channel.
+ * Instead, the caller temporarily closes SDL_mixer and this module opens
+ * the playback device exclusively. SDL_QueueAudio copies each PCM block
+ * into SDL's FIFO, which its audio thread drains continuously. The device
+ * is closed before control returns so SDL_mixer can reopen it.
  */
-static void emulator_audio_init(struct mCore *core) {
-    /*
-     * Enable audio in mGBA config BEFORE reset so the audio hardware
-     * initialises with the correct sample rate. Calling this after
-     * reset causes blip to produce silence (all zeros).
-     */
-    mCoreConfigSetIntValue(&core->config, "audio.enable", 1);
-    mCoreConfigSetIntValue(&core->config, "audio.volume", 256);
-    mCoreLoadConfig(core);
-
-    /*
-     * mCoreConfigSetIntValue("audio.enable", 1) + mCoreLoadConfig does NOT
-     * reliably enable the GBA's individual audio channels in this version
-     * of libmgba (the 4 PSG channels + 2 direct-sound/FIFO channels) -
-     * confirmed by blip_samples_avail() reporting real sample counts while
-     * every sample value was 0. The actual per-channel mixer enable lives
-     * behind a separate core API: enableAudioChannel().
-     *
-     * NOTE: we do NOT call core->listAudioChannels(core, NULL) here - passing
-     * NULL as the second argument crashed (SIGBUS / bad write) inside
-     * libmgba's internal list function, which appears to write through that
-     * pointer unconditionally rather than treating NULL as "count only".
-     * The GBA hardware always has exactly 6 audio channels (4 PSG + 2
-     * direct-sound/FIFO), so we just hardcode that instead of querying it.
-     */
-    /*
-     * TEMPORARILY DISABLED FOR DEBUGGING: enableAudioChannel calls were
-     * crashing inside _GBACoreLookupIdentifier with a bad write fault.
-     * lldb backtrace showed core->enableAudioChannel(core, 1, true) loading
-     * a function pointer from offset 0x910 in the mCore struct and jumping
-     * into a location that doesn't match the expected 3-pointer-arg
-     * signature. Removing this call to confirm it's the actual crash cause
-     * before re-enabling audio channels via a different approach.
-     */
-    /*
-    for (size_t i = 0; i < 6; i++) {
-        core->enableAudioChannel(core, i, true);
+static int emulator_audio_init(struct mCore *core) {
+    /* Enable the channels mGBA exposes, using their API-supplied IDs rather
+       than assuming GBA channel indices. */
+    const struct mCoreChannelInfo *channels = NULL;
+    size_t channel_count = core->listAudioChannels(core, &channels);
+    if (channels && core->enableAudioChannel) {
+        for (size_t i = 0; i < channel_count; i++) {
+            core->enableAudioChannel(core, channels[i].id, true);
+        }
+        printf("[emu-audio] Enabled %zu mGBA audio channels\n", channel_count);
+    } else {
+        fprintf(stderr, "[emu-audio] mGBA exposed no configurable audio channels\n");
     }
-    printf("[emu-audio] Enabled 6 audio channels\n");
-    */
-    printf("[emu-audio] Skipped enableAudioChannel calls (debugging)\n");
 
     blip_t *left  = core->getAudioChannel(core, 0);
     blip_t *right = core->getAudioChannel(core, 1);
-
-    /* GBA audio clock is fixed at 32768 Hz, output to 44100 Hz */
-    blip_set_rates(left,  32768, EMU_SAMPLE_RATE);
-    blip_set_rates(right, 32768, EMU_SAMPLE_RATE);
+    if (!left || !right) {
+        fprintf(stderr, "[emu-audio] mGBA did not provide stereo audio buffers\n");
+        return -1;
+    }
 
     if (!s_audio_buf) {
-        s_audio_buf = malloc(AUDIO_BUFFER_SIZE * sizeof(int16_t));
-    }
-
-    /* Open the emulator's own audio device once. We do NOT touch
-       SDL_mixer here at all — the caller is responsible for stopping
-       any mixer music before launching the emulator (renderer.c
-       already does this via music_stop_current()). */
-    if (s_audio_dev == 0) {
-        SDL_AudioSpec want, have;
-        SDL_zero(want);
-        want.freq     = EMU_SAMPLE_RATE;
-        want.format   = AUDIO_S16SYS;
-        want.channels = 2;
-        want.samples  = 1024;
-        want.callback = NULL; /* we push samples via SDL_QueueAudio */
-
-        s_audio_dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
-        if (s_audio_dev == 0) {
-            fprintf(stderr, "[emu-audio] SDL_OpenAudioDevice failed: %s\n", SDL_GetError());
-        } else {
-            SDL_PauseAudioDevice(s_audio_dev, 0); /* unpause: start draining the queue */
-            printf("[emu-audio] Opened device @ %d Hz, %d channels\n", have.freq, have.channels);
+        s_audio_buf = malloc(AUDIO_BUFFER_FRAMES * 2 * sizeof(*s_audio_buf));
+        if (!s_audio_buf) {
+            fprintf(stderr, "[emu-audio] Could not allocate the streaming buffer\n");
+            return -1;
         }
     }
+
+    SDL_AudioSpec want, have;
+    SDL_zero(want);
+    want.freq = EMU_SAMPLE_RATE;
+    want.format = AUDIO_S16SYS;
+    want.channels = 2;
+    want.samples = EMU_DEVICE_FRAMES;
+    want.callback = NULL; /* push samples with SDL_QueueAudio */
+
+    s_audio_dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+    if (s_audio_dev == 0) {
+        fprintf(stderr, "[emu-audio] SDL_OpenAudioDevice failed: %s\n", SDL_GetError());
+        return -1;
+    }
+
+    s_audio_rate = have.freq;
+    core->setAudioBufferSize(core, EMU_DEVICE_FRAMES);
+
+    /* mGBA timestamps samples in emulated CPU cycles. Its official SDL
+       frontend likewise uses core->frequency() as the blip input clock. */
+    blip_set_rates(left, core->frequency(core), s_audio_rate);
+    blip_set_rates(right, core->frequency(core), s_audio_rate);
+
+    SDL_PauseAudioDevice(s_audio_dev, 0);
+    printf("[emu-audio] Opened exclusive device @ %d Hz, %d channels\n",
+           have.freq, have.channels);
+    return 0;
 }
 
 static void emulator_audio_pump(struct mCore *core) {
@@ -113,52 +95,45 @@ static void emulator_audio_pump(struct mCore *core) {
     blip_t *left  = core->getAudioChannel(core, 0);
     blip_t *right = core->getAudioChannel(core, 1);
 
+    if (!left || !right || !s_audio_buf) return;
+
     int available = blip_samples_avail(left);
-
-    static int frame_count = 0;
-    if (frame_count++ % 60 == 0) {
-        printf("[emu-audio] available=%d queued_bytes=%u\n",
-               available, (unsigned)SDL_GetQueuedAudioSize(s_audio_dev));
-    }
-
+    int right_available = blip_samples_avail(right);
+    if (right_available < available) available = right_available;
     if (available <= 0) return;
 
-    int16_t lbuf[2048];
-    int16_t rbuf[2048];
-
     int count = available;
-    if (count > AUDIO_BUFFER_SIZE / 2) count = AUDIO_BUFFER_SIZE / 2;
-    if (count > 2048) count = 2048;
-
-    count = blip_read_samples(left,  lbuf, count, 0);
-             blip_read_samples(right, rbuf, count, 0);
-
-    for (int i = 0; i < count; i++) {
-        s_audio_buf[i * 2]     = lbuf[i];
-        s_audio_buf[i * 2 + 1] = rbuf[i];
-    }
+    if (count > AUDIO_BUFFER_FRAMES) count = AUDIO_BUFFER_FRAMES;
+    count = blip_read_samples(left, s_audio_buf, count, 1);
+    int right_count = blip_read_samples(right, s_audio_buf + 1, count, 1);
+    if (right_count < count) count = right_count;
 
     int byte_len = count * 2 * (int)sizeof(int16_t);
-
-    if (frame_count % 60 == 1) {
-        int16_t peak = 0;
-        for (int i = 0; i < count; i++) {
-            int16_t v = lbuf[i] < 0 ? -lbuf[i] : lbuf[i];
-            if (v > peak) peak = v;
-        }
-        printf("[emu-audio] queueing %d bytes (%d samples) peak_amplitude=%d\n", byte_len, count, peak);
-    }
 
     /* Prevent unbounded latency growth: if the emulator is running
        ahead of real time and the queue backs up, drop the backlog
        rather than letting audio drift further and further behind. */
     Uint32 queued_bytes = SDL_GetQueuedAudioSize(s_audio_dev);
-    Uint32 max_bytes = (Uint32)((EMU_SAMPLE_RATE * 2 * sizeof(int16_t) * EMU_MAX_QUEUED_MS) / 1000);
+    Uint32 bytes_per_second = (Uint32)(s_audio_rate * 2 * sizeof(int16_t));
+    Uint32 max_bytes = bytes_per_second * EMU_MAX_QUEUED_MS / 1000;
     if (queued_bytes > max_bytes) {
         SDL_ClearQueuedAudio(s_audio_dev);
     }
 
-    SDL_QueueAudio(s_audio_dev, s_audio_buf, byte_len);
+    if (SDL_QueueAudio(s_audio_dev, s_audio_buf, (Uint32)byte_len) < 0) {
+        fprintf(stderr, "[emu-audio] SDL_QueueAudio failed: %s\n", SDL_GetError());
+        return;
+    }
+
+    /* Audio is the stable clock on renderers where vsync is unavailable
+       or runs above 60 Hz. Briefly wait instead of repeatedly dropping a
+       growing queue, which otherwise produces fast and choppy playback. */
+    queued_bytes = SDL_GetQueuedAudioSize(s_audio_dev);
+    Uint32 target_bytes = bytes_per_second * EMU_TARGET_QUEUED_MS / 1000;
+    if (queued_bytes > target_bytes) {
+        Uint32 delay_ms = (queued_bytes - target_bytes) * 1000 / bytes_per_second;
+        if (delay_ms > 0) SDL_Delay(delay_ms);
+    }
 }
 
 static void emulator_audio_shutdown(void) {
@@ -192,16 +167,27 @@ int emulator_run(SDL_Renderer *ren, const char *rom_path) {
     if (!vf) { printf("[emu] Failed to open ROM: %s\n", rom_path); return -1; }
 
     s_core = mCoreFindVF(vf);
-    if (!s_core) { printf("[emu] No core found for ROM: %s\n", rom_path); return -1; }
+    if (!s_core) {
+        printf("[emu] No core found for ROM: %s\n", rom_path);
+        vf->close(vf);
+        return -1;
+    }
 
     if (!s_core->init(s_core)) {
         printf("[emu] core->init() FAILED - core is not safely usable\n");
+        vf->close(vf);
         s_core = NULL;
         return -1;
     }
     printf("[emu] core->init() succeeded\n");
 
     mCoreInitConfig(s_core, NULL);
+    mCoreConfigSetIntValue(&s_core->config, "volume", 0x100);
+    mCoreConfigSetIntValue(&s_core->config, "mute", 0);
+    mCoreConfigSetUIntValue(&s_core->config, "audioBuffers", EMU_DEVICE_FRAMES);
+    mCoreConfigSetUIntValue(&s_core->config, "sampleRate", EMU_SAMPLE_RATE);
+    mCoreConfigSetValue(&s_core->config, "savegamePath", "../assets/saves/");
+    mCoreLoadConfig(s_core);
 
     /*
      * CRITICAL: mInputMapInit must be called after mCoreInitConfig.
@@ -216,25 +202,58 @@ int emulator_run(SDL_Renderer *ren, const char *rom_path) {
     unsigned width, height;
     s_core->desiredVideoDimensions(s_core, &width, &height);
 
-    s_video_buf = malloc(width * height * 4);
+    s_video_buf = malloc(width * height * sizeof(color_t));
+    if (!s_video_buf) {
+        fprintf(stderr, "[emu] Could not allocate the video buffer\n");
+        vf->close(vf);
+        mInputMapDeinit(&s_core->inputMap);
+        mCoreConfigDeinit(&s_core->config);
+        s_core->deinit(s_core);
+        s_core = NULL;
+        return -1;
+    }
     s_core->setVideoBuffer(s_core, s_video_buf, width);
 
-    mCoreConfigSetValue(&s_core->config, "savegamePath", "../assets/saves/");
-
-    s_core->loadROM(s_core, vf);
+    if (!s_core->loadROM(s_core, vf)) {
+        fprintf(stderr, "[emu] mGBA failed to load ROM: %s\n", rom_path);
+        vf->close(vf);
+        free(s_video_buf);
+        s_video_buf = NULL;
+        mInputMapDeinit(&s_core->inputMap);
+        mCoreConfigDeinit(&s_core->config);
+        s_core->deinit(s_core);
+        s_core = NULL;
+        return -1;
+    }
 
     /*
      * Audio init MUST come before reset — blip rates need to be set
      * before the core initialises its audio hardware on reset. This
      * also opens our dedicated raw audio device (see comment above
-     * emulator_audio_init). SDL_mixer is intentionally left alone;
-     * the caller already stops mixer music before invoking us.
+     * emulator_audio_init). The caller has already released SDL_mixer's
+     * device before invoking us.
      */
-    emulator_audio_init(s_core);
+    if (emulator_audio_init(s_core) < 0) {
+        fprintf(stderr, "[emu] Continuing without emulator audio\n");
+    }
     s_core->reset(s_core);
 
     SDL_Texture *tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_RGBA32,
         SDL_TEXTUREACCESS_STREAMING, width, height);
+    if (!tex) {
+        fprintf(stderr, "[emu] SDL_CreateTexture failed: %s\n", SDL_GetError());
+        emulator_audio_shutdown();
+        free(s_video_buf);
+        free(s_audio_buf);
+        s_video_buf = NULL;
+        s_audio_buf = NULL;
+        s_core->unloadROM(s_core);
+        mInputMapDeinit(&s_core->inputMap);
+        mCoreConfigDeinit(&s_core->config);
+        s_core->deinit(s_core);
+        s_core = NULL;
+        return -1;
+    }
 
     /* Fixed state path — original code crashed if no '/' in rom_path */
     const char *basename = strrchr(rom_path, '/');
@@ -257,7 +276,7 @@ int emulator_run(SDL_Renderer *ren, const char *rom_path) {
 
         emulator_audio_pump(s_core);
 
-        SDL_UpdateTexture(tex, NULL, s_video_buf, width * 4);
+        SDL_UpdateTexture(tex, NULL, s_video_buf, width * (int)sizeof(color_t));
         SDL_RenderClear(ren);
         SDL_RenderCopy(ren, tex, NULL, NULL);
         SDL_RenderPresent(ren);
@@ -271,6 +290,9 @@ int emulator_run(SDL_Renderer *ren, const char *rom_path) {
     free(s_audio_buf);
     s_video_buf = NULL;
     s_audio_buf = NULL;
+    s_core->unloadROM(s_core);
+    mInputMapDeinit(&s_core->inputMap);
+    mCoreConfigDeinit(&s_core->config);
     s_core->deinit(s_core);
     s_core = NULL;
 

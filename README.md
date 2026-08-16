@@ -7,8 +7,14 @@ A custom media OS built with SDL2.
 Install the following before running:
 
 ```bash
-brew install sdl2 sdl2_ttf sdl2_mixer mgba
-brew install python3
+brew install sdl2 sdl2_ttf sdl2_mixer mgba python3
+```
+
+On Debian/Ubuntu Linux:
+
+```bash
+sudo apt install build-essential curl python3-dev \
+  libsdl2-dev libsdl2-ttf-dev libsdl2-mixer-dev libmgba-dev
 ```
 
 ### Python environment (important)
@@ -62,7 +68,7 @@ This will scan your library, build, and launch the app in one step.
 ## Compatibility
 
 - macOS
-- Linux (`sudo apt install libsdl2-dev libsdl2-ttf-dev libsdl2-mixer-dev libmgba-dev`)
+- Linux
 - Windows support coming soon
 
 ## Controls
