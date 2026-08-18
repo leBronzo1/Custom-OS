@@ -3,7 +3,7 @@
 #include "audio.h"
 #include "cJSON.h"
 #include "emulator.h"
-#include "python_bridge.h"
+#include "monitor_worker.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -34,8 +34,8 @@ typedef struct {
 
 static RomEntry s_roms[MAX_ROMS];
 static int s_rom_count = 0;
-static SysInfo s_system_info;
-static char s_monitor_error[160];
+static MonitorSnapshot s_system_info;
+static int s_monitor_loading = 0;
 
 #define TRACK_ROW_H 44
 #define TRACK_LIST_X 80
@@ -140,71 +140,31 @@ static void games_load_library(void) {
     printf("[games] Loaded %d ROMs\n", s_rom_count);
 }
 
-static int json_number(cJSON *object, const char *name, double *out) {
-    cJSON *value = cJSON_GetObjectItem(object, name);
-    if (!cJSON_IsNumber(value)) return 0;
-    *out = value->valuedouble;
-    return 1;
-}
-
-static int json_string(cJSON *object, const char *name, char *out, size_t out_size) {
-    cJSON *value = cJSON_GetObjectItem(object, name);
-    if (!cJSON_IsString(value) || !value->valuestring) return 0;
-    snprintf(out, out_size, "%s", value->valuestring);
-    return 1;
-}
-
 static void monitor_refresh(void) {
-    memset(&s_system_info, 0, sizeof(s_system_info));
-    s_monitor_error[0] = '\0';
+    if (s_monitor_loading) return;
 
-    if (!python_bridge_init()) {
-        snprintf(s_monitor_error, sizeof(s_monitor_error), "Could not start the Python monitor.");
+    if (monitor_worker_start() < 0) {
+        snprintf(s_system_info.error, sizeof(s_system_info.error),
+                 "Could not start the monitor worker.");
         return;
     }
 
-    char *json = python_bridge_get_system_info();
-    if (!json) {
-        snprintf(s_monitor_error, sizeof(s_monitor_error), "Could not read system information.");
-        return;
+    int queued = monitor_worker_request_refresh();
+    if (queued > 0) {
+        s_monitor_loading = 1;
+        s_system_info.error[0] = '\0';
+    } else if (queued < 0) {
+        snprintf(s_system_info.error, sizeof(s_system_info.error),
+                 "Could not request system information.");
     }
+}
 
-    cJSON *root = cJSON_Parse(json);
-    free(json);
-    if (!root) {
-        snprintf(s_monitor_error, sizeof(s_monitor_error), "Python returned invalid monitor data.");
-        return;
+static void monitor_poll_result(void) {
+    MonitorSnapshot completed;
+    if (monitor_worker_poll(&completed)) {
+        s_system_info = completed;
+        s_monitor_loading = 0;
     }
-
-    cJSON *cpu = cJSON_GetObjectItem(root, "cpu");
-    cJSON *memory = cJSON_GetObjectItem(root, "memory");
-    cJSON *disk = cJSON_GetObjectItem(root, "disk");
-    double cores = 0;
-    double memory_total = 0, memory_used = 0;
-    double disk_total = 0, disk_used = 0;
-    int valid = cJSON_IsObject(cpu) && cJSON_IsObject(memory) && cJSON_IsObject(disk)
-        && json_number(cpu, "cores", &cores)
-        && json_number(cpu, "usage", &s_system_info.cpu_percent)
-        && json_number(memory, "total", &memory_total)
-        && json_number(memory, "used", &memory_used)
-        && json_number(memory, "percent", &s_system_info.ram_percent)
-        && json_number(disk, "total", &disk_total)
-        && json_number(disk, "used", &disk_used)
-        && json_number(disk, "percent", &s_system_info.disk_percent)
-        && json_string(root, "current_time", s_system_info.date, sizeof(s_system_info.date))
-        && json_string(root, "boot_time", s_system_info.bootTime, sizeof(s_system_info.bootTime));
-
-    if (valid) {
-        s_system_info.cores = (int)cores;
-        s_system_info.ram_total_gib = memory_total / (1024.0 * 1024.0 * 1024.0);
-        s_system_info.ram_used_gib = memory_used / (1024.0 * 1024.0 * 1024.0);
-        s_system_info.disk_total_gib = disk_total / (1024.0 * 1024.0 * 1024.0);
-        s_system_info.disk_used_gib = disk_used / (1024.0 * 1024.0 * 1024.0);
-    } else {
-        memset(&s_system_info, 0, sizeof(s_system_info));
-        snprintf(s_monitor_error, sizeof(s_monitor_error), "Python returned incomplete monitor data.");
-    }
-    cJSON_Delete(root);
 }
 
 static void on_music_finished(void) {
@@ -291,6 +251,8 @@ int run_loop(Renderer* r) {
     SDL_Color white = {255, 255, 255, 255};
 
     while (running) {
+        monitor_poll_result();
+
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT) running = 0;
 
@@ -392,8 +354,8 @@ int run_loop(Renderer* r) {
 }
 
 void shutdown_sdl(Renderer* r) {
+    monitor_worker_shutdown();
     music_clear();
-    python_bridge_shutdown();
     audio_shutdown();
     img_kill(r);
 
@@ -505,8 +467,10 @@ void draw_monitor(Renderer* r) {
     char line[128];
 
     draw_text(r, "System Monitor", 80, 55, white);
-    if (s_monitor_error[0]) {
-        draw_text(r, s_monitor_error, 80, 120, white);
+    if (s_system_info.error[0]) {
+        draw_text(r, s_system_info.error, 80, 120, white);
+    } else if (s_monitor_loading && s_system_info.cores == 0) {
+        draw_text(r, "Loading system information...", 80, 120, white);
     } else {
         snprintf(line, sizeof(line), "CPU: %.1f%%  (%d cores)", s_system_info.cpu_percent, s_system_info.cores);
         draw_text(r, line, 80, 120, white);
@@ -516,7 +480,7 @@ void draw_monitor(Renderer* r) {
         draw_text(r, line, 80, 230, white);
         snprintf(line, sizeof(line), "Time: %s", s_system_info.date);
         draw_text(r, line, 80, 285, white);
-        snprintf(line, sizeof(line), "Boot time: %s", s_system_info.bootTime);
+        snprintf(line, sizeof(line), "Boot time: %s", s_system_info.boot_time);
         draw_text(r, line, 80, 340, white);
     }
 
@@ -527,7 +491,9 @@ void draw_monitor(Renderer* r) {
     SDL_RenderFillRect(r->ren, &refresh_btn);
     SDL_SetRenderDrawColor(r->ren, 180, 200, 255, 255);
     SDL_RenderDrawRect(r->ren, &refresh_btn);
-    draw_text(r, "Refresh", REFRESH_BTN_X + 35, REFRESH_BTN_Y + 12, white);
+    draw_text(r, s_monitor_loading ? "Refreshing..." : "Refresh",
+              REFRESH_BTN_X + (s_monitor_loading ? 12 : 35),
+              REFRESH_BTN_Y + 12, white);
 }
 
 void draw_music(Renderer* r) {

@@ -36,20 +36,6 @@ typedef struct {
     char file[512];
 } TrackEntry;
 
-// Holds system info
-typedef struct {
-    int cores;
-    double cpu_percent;
-    double ram_total_gib;
-    double ram_used_gib;
-    double ram_percent;
-    double disk_total_gib;
-    double disk_used_gib;
-    double disk_percent;
-    char date[20];
-    char bootTime[20];
-} SysInfo;
-
 // Set up the base SDL window
 int init_sdl(Renderer* r);
 
